@@ -52,6 +52,9 @@ interface RequestPayload {
   frequency_penalty: number;
   top_p: number;
   max_tokens?: number;
+  stream_options?: {
+    include_usage?: boolean;
+  };
 }
 
 export class ChatGPTApi implements LLMApi {
@@ -128,6 +131,17 @@ export class ChatGPTApi implements LLMApi {
       // Please do not ask me why not send max_tokens, no reason, this param is just shit, I dont want to explain anymore.
     };
 
+    // nccLog 記錄的東西可以自行調整
+    const nccLog = {
+      stream: requestPayload.stream,
+      model: requestPayload.model,
+      temperature: requestPayload.temperature,
+      presence_penalty: requestPayload.presence_penalty,
+      frequency_penalty: requestPayload.frequency_penalty,
+      top_p: requestPayload.top_p,
+      usage: null,
+    };
+
     // add max_tokens to vision model
     if (visionModel && modelConfig.model.includes("preview")) {
       requestPayload["max_tokens"] = Math.max(modelConfig.max_tokens, 4000);
@@ -155,6 +169,12 @@ export class ChatGPTApi implements LLMApi {
       );
 
       if (shouldStream) {
+        chatPayload.body = JSON.stringify({
+          ...requestPayload,
+          stream_options: {
+            include_usage: true,
+          },
+        });
         let responseText = "";
         let remainText = "";
         let finished = false;
@@ -242,6 +262,7 @@ export class ChatGPTApi implements LLMApi {
             const text = msg.data;
             try {
               const json = JSON.parse(text);
+              if (json.usage) nccLog.usage = json.usage;
               const choices = json.choices as Array<{
                 delta: { content: string };
               }>;
@@ -270,6 +291,12 @@ export class ChatGPTApi implements LLMApi {
           },
           onclose() {
             finish();
+            // 每一次訊息發出後最後會跑到這裡，這裡可以送出 nccLog 資料
+            window._elog.push({
+              web: "104_next_chat",
+              track: ["chat"],
+              ext: nccLog,
+            });
           },
           onerror(e) {
             options.onError?.(e);
