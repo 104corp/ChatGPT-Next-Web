@@ -292,6 +292,7 @@ export class ChatGPTApi implements LLMApi {
           onclose() {
             finish();
             // 每一次訊息發出後最後會跑到這裡，這裡可以送出 nccLog 資料
+            console.log("使用者已送出資料", nccLog);
             window._elog.push({
               web: "104_next_chat",
               track: ["chat"],
